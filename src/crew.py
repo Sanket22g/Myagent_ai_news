@@ -26,7 +26,7 @@ class MyagentUdate():
         return Agent(
             config=self.agents_config['news_scout'], # type: ignore[index]
             verbose=True,
-            tools=[SerperDevTool(), ScrapeWebsiteTool(), SeleniumScrapingTool()],
+            tools=[SerperDevTool(), ScrapeWebsiteTool()],
             
         )
 
