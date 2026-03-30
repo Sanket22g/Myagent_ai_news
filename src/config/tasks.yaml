@@ -1,0 +1,98 @@
+# config/tasks.yaml
+
+fetch_ai_news:
+  description: >
+    Today is {date}. Only include articles published after {two_days_ago}.
+
+    Use SerperDevTool to run ONE single search:
+      Query: "latest AI model architecture research {date}"
+
+    From that ONE search result pick the top 7 most relevant AI stories.
+    DO NOT run multiple searches — ONE search only to save API quota.
+
+    For each story extract:
+      - "title"        : clean readable title (max 12 words)
+      - "source"       : publication name
+      - "publish_date" : YYYY-MM-DD (skip if older than {two_days_ago})
+      - "summary"      :  what is new and why it matters and all related key details in 3 plain-English sentences like mini blog post
+      - "url"          : direct article link
+      - "category"     : model_release | research_paper | framework | product_launch | regulation
+
+    Output: raw JSON array of 7 objects. No markdown, no code fences.
+
+  expected_output: >
+    Raw JSON array of 7 objects, all fields filled, no nulls.
+    [{"title":"...","source":"...","publish_date":"...","summary":"...","url":"...","category":"..."}]
+  agent: news_scout
+
+
+fetch_related_youtube_videos:
+  description: >
+    You have 7 AI topics from fetch_ai_news.
+
+    IMPORTANT — DO THIS IN ONE SINGLE PASS:
+    Run exactly 7 YouTube searches total (one per topic) back-to-back without
+    stopping to think between searches. Do NOT make extra searches.
+    Do NOT re-search the same topic twice.
+
+    For each topic:
+      1. Search YouTube using the topic title
+      2. Take the first 2 URLs returned
+      3. If the topic is too new and results seem unrelated, instead search
+         the core technology (e.g. "RAG explained", "mixture of experts explained")
+
+    For each video fill ALL fields — if title/channel/date are unknown,
+    write your best inference from the URL and topic context. Never leave null.
+
+    Fields per video:
+      - "title"        : video title (infer from topic if unknown)
+      - "url"          : YouTube URL exactly as returned by tool
+      - "channel_name" : channel name (infer if unknown, e.g. "AI Research Channel")
+      - "publish_date" : YYYY-MM-DD or "unknown"
+      - "description"  : 1 sentence about what the video covers
+
+    Output: raw JSON object. Key = topic title. Value = array of 2 video objects.
+    No markdown, no code fences.
+
+  expected_output: >
+    Raw JSON object keyed by topic title, 2 videos each, no nulls.
+    {"Topic Title": [{"title":"...","url":"...","channel_name":"...","publish_date":"...","description":"..."}]}
+  agent: youtube_research_scout
+  context:
+    - fetch_ai_news
+
+
+generate_final_summary:
+  description: >
+    Merge fetch_ai_news and fetch_related_youtube_videos into one final report.
+    Do NOT call any tools — just synthesize the data you already have.
+
+    Set "generated_at" to exactly: {date}
+    Set "date_range" to: "Last 48 hours from {two_days_ago} to {date}"
+
+    For each of the 7 topics build:
+      - "topic_title"   : clean title
+      - "category"      : from news_scout
+      - "source"        : publication name
+      - "publish_date"  : article date
+      - "article_url"   : original link
+      - "plain_summary" :  what is new and why it matters and all related key details in 3 plain-English sentences like mini blog post
+      - "key_takeaways" : array of 3 short strings
+      - "related_links" : [{"label":"Original Article","url":"..."}]
+      - "youtube_videos": 2 video objects from youtube_research_scout
+
+    Output: one raw JSON object. No markdown, no code fences, no nulls.
+
+  expected_output: >
+    Single raw JSON object:
+    {
+      "generated_at": "{date}",
+      "report_title": "AI Research & Technology Daily Digest",
+      "total_topics": 7,
+      "date_range": "Last 48 hours from {two_days_ago} to {date}",
+      "topics": [...]
+    }
+  agent: summary_analyst
+  context:
+    - fetch_ai_news
+    - fetch_related_youtube_videos
